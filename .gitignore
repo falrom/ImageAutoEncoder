@@ -1,7 +1,8 @@
 
 *.jpg
 logs/
-data/
+data/*
+!data/test/
 checkpoints/
 .idea/
 __pycache__/

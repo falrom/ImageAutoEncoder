@@ -20,141 +20,72 @@ from utils import cv_imread
 from utils import cv_imwrite
 
 
-# class Model_base:
-#
-#     def __init__(self, model_name, name):
-#         self.model_name = model_name
-#         self.name = name
-#
-#         self.info_top = {}
-#         self.info_top['name'] = name
-#         self.info_top['model_name'] = model_name
-#
-#     def _build_train(self):
-#         # needs: inputs, states, inference, tails, loss, optimizer, logs
-#         raise NotImplementedError('No implementation for function: _build_train')
-#
-#     def _build_test(self):
-#         raise NotImplementedError('No implementation for function: _build_test')
-#
-#     def _build_evaluate(self):
-#         raise NotImplementedError('No implementation for function: _build_evaluate')
-#
-#     def _build_predict(self):
-#         raise NotImplementedError('No implementation for function: _build_predict')
-#
-#     def _get_train_batch(self):
-#         raise NotImplementedError('No implementation for function: _get_train_batch')
-#
-#     def _get_test_batch(self):
-#         raise NotImplementedError('No implementation for function: _get_test_batch')
-#
-#     def train(self,
-#               train_data_path,
-#               test_data_path,
-#               time_str=None,
-#               train_batch_size=64,
-#               test_batch_size=512,
-#               test_interval=100,
-#               save_interval=500,
-#               loss_func='l2',
-#               optimizer='adam',
-#               learning_rate=0.001,
-#               decay=None):
-#         # params:
-#         time_str = time_str or get_time_str()
-#         self.loss_func = loss_func
-#         self.optimizer = optimizer
-#         self.train_data_path = train_data_path
-#         self.test_data_path = test_data_path
-#         self.train_batch_size = train_batch_size
-#         self.test_batch_size = test_batch_size
-#
-#         # paths:
-#         log_dir = os.path.join('./logs', self.model_name, self.name, time_str)
-#         ckpt_dir = os.path.join('./checkpoints', self.model_name, self.name, time_str)
-#         if not os.path.exists(log_dir):
-#             os.makedirs(log_dir)
-#         if not os.path.exists(ckpt_dir):
-#             os.makedirs(ckpt_dir)
-#         latest_ckpt_path = tf.train.latest_checkpoint(ckpt_dir)
-#
-#         # info:
-#         self.info_train = {}
-#         self.info_train['time_str'] = str(time_str)
-#         self.info_train['train_batch_size'] = str(train_batch_size)
-#         self.info_train['test_batch_size'] = str(test_batch_size)
-#         self.info_train['loss_func'] = str(loss_func)
-#         self.info_train['optimizer'] = str(optimizer)
-#         self.info_train['learning_rate'] = str(learning_rate)
-#         self.info_train['decay'] = str(decay)
-#         self.info_train['train_data_path'] = str(train_data_path)
-#         self.info_train['test_data_path'] = str(test_data_path)
-#         print('\n\n********** Train **********')
-#         print_info([self.info_train])
-#         print('********** ***** **********')
-#         record_info([self.info_top, self.info_train], os.path.join(log_dir, 'info.txt'))
-#
-#         # define graph:
-#         print('\n** Define graph...')
-#         self.train_graph = tf.Graph()
-#         with self.train_graph.as_default():
-#             self._build_train()
-#             # logs:
-#             log_writer = tf.summary.FileWriter(log_dir)
-#             log_writer.add_graph(self.train_graph)
-#             log_writer.flush()
-#             # saver:
-#             saver_all = tf.train.Saver(max_to_keep=0, name='saver_all')
-#         print('Done.')
-#
-#         # datasets:
-#         self.train_sess = tf.Session(graph=self.train_graph)
-#         sess = self.train_sess
-#         print('\n** Generate datasets...')
-#         print('train data path:', train_data_path)
-#         print('test  data path:', test_data_path)
-#         with self.train_graph.as_default():
-#             train_batches = self._get_train_batch()
-#             test_batches = self._get_test_batch()
-#         print('Done.')
-#
-#         # init:
-#         if latest_ckpt_path:
-#             saver_all.restore(sess, latest_ckpt_path)
-#         else:
-#             sess.run(self.variable_init)
-#         step = tf.train.global_step(sess, self.global_step)
-#
-#         self.train_sess.close()
-#         print('\nALL DONE.')
-#
-#     def test(self):
-#         raise NotImplementedError('No implementation for function: test')
-#
-#     def evaluate(self):
-#         # self.info_evaluate = {}
-#         pass
-#
-#     def predict(self):
-#         raise NotImplementedError('No implementation for function: predict')
+class Model_base:
+
+    def __init__(self, model_name, name):
+        self.model_name = model_name
+        self.name = name
+
+        self.MODE_TRAIN = 'TRAIN'
+        self.MODE_TEST = 'TEST'
+        self.MODE_EVAL = 'EVAL'
+        self.MODE_PREDICT = 'PREDICT'
+
+        self.info_top = {}
+        self.info_top['name'] = name
+        self.info_top['model_name'] = model_name
+
+    def _inference(self, inputs):
+        raise NotImplementedError('No implementation for function: _inference')
+
+    def _build(self, mode):
+        # needs: inputs, states, inference, tails, loss, optimizer, logs
+        raise NotImplementedError('No implementation for function: _build')
+
+    def _get_epoch(self, step, batch_size, epoch_volume):
+        return (step * batch_size - 1) // epoch_volume + 1
+
+    def _lr_update(self, lr0, step, epoch, decay, strategy, minimun=1e-10):
+        # custom strategy：
+        if hasattr(strategy, '__call__'):
+            return strategy(lr0, step, epoch, decay, minimun)
+        # no decay:
+        if decay is None:
+            return lr0
+        # built-in decay methods:
+        if strategy == 'exponent':
+            return max(lr0 * (decay ** step), minimun)
+        elif strategy == 'linear':
+            return max(lr0 - decay * step, minimun)
+        elif strategy == 'Inverse':
+            return max(lr0 / (step * decay + 1), minimun)
+        else:
+            raise Exception('Unknown strategy: ' + str(strategy))
+
+    def train(self):
+        raise NotImplementedError('No implementation for function: train')
+
+    def test(self):
+        raise NotImplementedError('No implementation for function: test')
+
+    def evaluate(self, ckpt_path):
+        raise NotImplementedError('No implementation for function: evaluate')
+
+    def predict(self):
+        raise NotImplementedError('No implementation for function: predict')
 
 
-class Model_CAE():
+class Model_CAE(Model_base):
 
     def __init__(self, name=None, ratio=3, channels=32, use_pooling=False, use_subpixel=True):
-        self.model_name = 'CAE'
-        self.name = name or self.model_name + ('_r%dc%d' % (ratio, channels))
+        model_name = 'CAE'
+        name = name or model_name + ('_r%dc%d' % (ratio, channels))
+        super(Model_CAE, self).__init__(model_name, name)
         self.ratio = ratio
         self.channels = channels
         self.use_pooling = use_pooling
         self.use_subpixel = use_subpixel
 
-        self.MODE_TRAIN = 'TRAIN'
-        self.MODE_EVAL = 'EVAL'
-        self.MODE_PREDICT = 'PREDICT'
-
-        self.info_top = {}
         self.info_top['name'] = self.name
         self.info_top['model_name'] = self.model_name
         self.info_top['ratio'] = str(self.ratio)
@@ -215,30 +146,10 @@ class Model_CAE():
             self.outputs = Outputs(predictions=self.decoded)
             self.psnr_uint8 = PSNR_uint8(outputs=self.outputs, labels=self.labels)
 
-    def _get_epoch(self, step, batch_size, epoch_volume):
-        return (step * batch_size) // epoch_volume + 1
-
-    def _lr_update(self, lr0, step, epoch, decay, strategy, minimun=1e-10):
-        # custom strategy：
-        if hasattr(strategy, '__call__'):
-            return strategy(lr0, step, epoch, decay, minimun)
-        # no decay:
-        if decay is None:
-            return lr0
-        # built-in decay methods:
-        if strategy == 'exponent':
-            return max(lr0 * (decay ** step), minimun)
-        elif strategy == 'linear':
-            return max(lr0 - decay * step, minimun)
-        elif strategy == 'Inverse':
-            return max(lr0 / (step * decay + 1), minimun)
-        else:
-            raise Exception('Unknown strategy: ' + str(strategy))
-
     def train(self,
-              train_data_path,
-              test_data_dir,
-              epoch_volume,
+              train_data_path='data/TFRdata/BSDS500_64.tfrecords',
+              test_data_dir='data/test',
+              epoch_volume=63000,
               epoch_to_train=None,
               time_str=None,
               train_batch_size=64,
@@ -325,7 +236,6 @@ class Model_CAE():
             saver_all.restore(sess, latest_ckpt_path)
         else:
             sess.run(self.variable_init)
-
         step = tf.train.global_step(sess, self.global_step)
         epoch = self._get_epoch(step, train_batch_size, epoch_volume)
         steps_to_run = None
@@ -335,9 +245,6 @@ class Model_CAE():
         # define process functions:
         def train_once(step, epoch=None, pring_log=True):
             train_batch = sess.run(get_train_batch)
-            # lr = learning_rate
-            # if decay:
-            #     lr = learning_rate * (decay ** step)
             feed_dic = {
                 self.inputs: train_batch,
                 self.labels: train_batch,
@@ -393,7 +300,7 @@ class Model_CAE():
                     log = 'step: %d  test-loss: %.10f  test-PSNR: %.6f' % (step, mse, psnr)
                     if epoch is not None:
                         log = ('epoch: %d ' % epoch) + log
-                    log = ('img: %s ' % name) + log
+                    log = ('| img: %s ' % name) + log
                     print(log)
             psnr_mean = psnr_sum / img_num
             log_writer.add_summary(sess.run(log_test_PSNR_mean, {test_PSNR_mean: psnr_mean}), step)
@@ -416,27 +323,26 @@ class Model_CAE():
         print('Done.')
 
         # run:
-        save_path = None
         print('\n** Begin training:')
+        save_path = None
         if latest_ckpt_path is None:
             test_all(0, 0, True)
             save_path = save_once(0)
         else:
             test_all(step, epoch, True)
-
         save_flag_final = False
         save_flag_max = False
         psnr_max = 0
         lr = self._lr_update(learning_rate, step, epoch, decay, decay_strategy)
         t = time.time()
-        while (steps_to_run is None) or (steps_to_run > 0):
+
+        while (steps_to_run is None) or (steps_to_run > 0):  # main loop
             step = tf.train.global_step(sess, self.global_step) + 1
             epoch_old = epoch
             epoch = self._get_epoch(step, train_batch_size, epoch_volume)
             if epoch_to_train and (epoch > epoch_to_train):
                 break
-            if epoch_old != epoch:
-                # test_all(step - 1, epoch_old, True, test_imgs_dir)
+            if epoch_old != epoch:  # change lr only when new epoch
                 if isinstance(decay_strategy, str):
                     if epoch_old % decay_epoch == 0:
                         lr = self._lr_update(learning_rate, step, epoch, decay, decay_strategy)
@@ -489,9 +395,8 @@ class Model_CAE():
 
     def evaluate(self,
                  ckpt_path,
-                 source_dir,
-                 # encoded_dir,
-                 decoded_dir):
+                 source_dir='data/source',
+                 decoded_dir='data/decoded'):
         # info:
         self.info_evaluate = {}
         self.info_evaluate['ckpt_path'] = str(ckpt_path)

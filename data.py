@@ -48,7 +48,7 @@ def generate_TFR(source_dir, patch_size=64, step=32):
 
 def dataset_TFR(TFR_path, batch_size, shuffle=None, repeat=True):
     """
-    Dataset from TFR files.
+    Dataset from TFR file.
     """
     patch_size = int(os.path.split(TFR_path)[-1].split('.')[0].split('_')[-1])
 
@@ -86,6 +86,18 @@ def dataset_TFR(TFR_path, batch_size, shuffle=None, repeat=True):
     return batch
 
 
+def _test_tfr(path):
+    get_batch = dataset_TFR(path, 3, 63000)
+    sess = tf.InteractiveSession()
+    for i in range(10):
+        imgs = sess.run(get_batch)
+        plt.figure()
+        plt.imshow(imgs[1])
+    sess.close()
+    plt.show()
+    os.system('PAUSE')
+
+
 def dataset_IMG(source_dir):
     exts = {'.jpg', 'jpeg', '.png'}
     filenames = [name for name in os.listdir(source_dir) if os.path.splitext(name)[-1].lower() in exts]
@@ -97,18 +109,6 @@ def dataset_IMG(source_dir):
         test_batches['imgs'].append(img / 255)
         test_batches['names'].append(img_name)
     return test_batches
-
-
-def _test_tfr(path):
-    get_batch = dataset_TFR(path, 3, 63000)
-    sess = tf.InteractiveSession()
-    for i in range(10):
-        imgs = sess.run(get_batch)
-        plt.figure()
-        plt.imshow(imgs[1])
-    sess.close()
-    plt.show()
-    os.system('PAUSE')
 
 
 if __name__ == '__main__':

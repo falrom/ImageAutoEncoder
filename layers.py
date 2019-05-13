@@ -1,11 +1,15 @@
+import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
-from utils import cv_imread
-import matplotlib.pyplot as plt
 import os
+
+from utils import cv_imread
 
 
 def deconv_subpixel(inputs, factor, name, add_front_conv=False, activation=None):
+    """
+    Sub-pixel convolution layer implemented with deconvolution/transpose-convolution API.
+    """
     inputs = tf.convert_to_tensor(inputs)
     bi, hi, wi, ci = inputs.shape.as_list()
     num = factor ** 2
@@ -31,8 +35,6 @@ def deconv_subpixel(inputs, factor, name, add_front_conv=False, activation=None)
                                              padding='same', activation=activation, use_bias=False,
                                              kernel_initializer=tf.constant_initializer(filters), trainable=False,
                                              name='subpix_deconv')
-        # outputs = tf.nn.conv2d_transpose(inputs, filter=filters, output_shape=(bi, hi * factor, wi * factor, co),
-        #                                  strides=(1, factor, factor, 1), padding='SAME', name='subpix_deconv')
 
     return outputs
 
@@ -73,8 +75,6 @@ def conv_autoencoder(inputs, ratio, channels, name, use_pooling=False, use_subpi
         with tf.variable_scope('Encoder'):  # encoder:
             conv_bgn = tf.layers.conv2d(inputs, filters=channels, kernel_size=3, strides=(1, 1), padding='same',
                                         activation=tf.nn.relu, name='conv_bgn')
-            # conv_bgn_2 = tf.layers.conv2d(conv_bgn_1, filters=channels, kernel_size=3, strides=(1, 1), padding='same',
-            #                               activation=tf.nn.relu, name='conv_bgn_2')
             node = conv_bgn
 
             for r in range(ratio):

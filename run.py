@@ -10,9 +10,9 @@ print('\n** GPU selection:', os.environ["CUDA_VISIBLE_DEVICES"])
 def lr_decay_strategy(lr0, step, epoch, decay, minimun):
     if epoch < 300:
         return 0.002
-    if epoch < 700:
+    if epoch < 800:
         return 0.001
-    if epoch < 900:
+    if epoch < 1200:
         return 0.0001
     return 0.00001
 
@@ -23,8 +23,7 @@ if __name__ == '__main__':
         train_data_path='data/TFRdata/BSDS500_64.tfrecords',
         test_data_dir='data/test',
         epoch_volume=63000,
-        epoch_to_train=1000,
-        loss_func='l1',
+        epoch_to_train=1500,
         # time_str='20190510170936',
         decay_strategy=lr_decay_strategy
     )
